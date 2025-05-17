@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Header from "./Components/Header";
 import Hero from "./Components/Hero";
+import Glasses from "./Components/Glasses";
 
 export default function Home() {
   return (
@@ -8,6 +9,7 @@ export default function Home() {
       <main className="w-full min-h-screen">
         <Header />
         <Hero />
+        <Glasses />
       </main>
       
     </div>
