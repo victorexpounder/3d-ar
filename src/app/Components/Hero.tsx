@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import ModalComponent from './Modal'
+import MainModal from './MainModal';
 
 interface Props {
     
@@ -7,6 +8,7 @@ interface Props {
 
 const Hero = (props: Props) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isMainOpen, setIsMainOpen] = useState(false);
     return (
         <div className='w-full flex gap-4 flex-col justify-center mt-[40px] max-sm:p-[16px] sm:items-center sm:mt-[80px] '>
             <h2 className='text-[2rem] sm:text-[3rem] text-[#1c2b33] font-medium max-w-[600px] sm:text-center'>
@@ -20,7 +22,8 @@ const Hero = (props: Props) => {
                 Virtual try-on
             </div>
 
-            <ModalComponent isModalOpen={isModalOpen}  setIsModalOpen={setIsModalOpen} />
+            <ModalComponent isModalOpen={isModalOpen}  setIsModalOpen={setIsModalOpen} setIsMainOpen={setIsMainOpen} />
+            <MainModal isMainOpen={isMainOpen} setIsMainOpen={setIsMainOpen} />
         </div>
     )
 }

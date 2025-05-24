@@ -6,9 +6,10 @@ import { X } from 'lucide-react';
 interface Props {
   isModalOpen: boolean;
   setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsMainOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const ModalComponent: React.FC<Props> = ({isModalOpen, setIsModalOpen}) => {
+const ModalComponent: React.FC<Props> = ({isModalOpen, setIsModalOpen, setIsMainOpen}) => {
   
 
   const showModal = () => {
@@ -17,6 +18,7 @@ const ModalComponent: React.FC<Props> = ({isModalOpen, setIsModalOpen}) => {
 
   const handleOk = () => {
     setIsModalOpen(false);
+    setIsMainOpen(true);
   };
 
   const handleCancel = () => {
