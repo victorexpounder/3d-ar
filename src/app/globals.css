@@ -4,6 +4,9 @@
   --background: #ffffff;
   --foreground: #171717;
 }
+*{
+  box-sizing: border-box;
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -17,4 +20,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Poppins", sans-serif;
+}
+.custom-modal .ant-modal-content {
+  border-radius: 2rem !important;
+  
 }
