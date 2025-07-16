@@ -18,7 +18,8 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
  
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [selected, setSelected] = useState(1);
-  const [position, setPosition] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [position, setPosition] = useState<{ x: number; y: number; z: number; scale?: number } | null>(null);
+
 
   const showModal = () => {
     setIsMainOpen(true);
@@ -68,68 +69,88 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
   }
 
   const startDetection = () => {
+  if (!videoRef.current) return;
+
+  const canvas = faceapi.createCanvasFromMedia(videoRef.current);
+  canvas.id = 'face-canvas';
+
+  const container = videoRef.current?.parentElement;
+  if (container) {
+    container.appendChild(canvas);
+  }
+  canvas.style.position = 'absolute';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.zIndex = '20';
+
+  const displaySize = {
+    width: videoRef.current.videoWidth,
+    height: videoRef.current.videoHeight,
+  };
+
+  faceapi.matchDimensions(canvas, displaySize);
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+
+  const interval = setInterval(async () => {
     if (!videoRef.current) return;
 
-    const canvas = faceapi.createCanvasFromMedia(videoRef.current);
-    canvas.id = 'face-canvas';
+    const detections = await faceapi
+      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks();
 
-    const container = videoRef.current?.parentElement;
-    if (container) {
-      container.appendChild(canvas);
-    }
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.zIndex = '20'; // Above video
+    if (detections) {
+      const resized = faceapi.resizeResults(detections, displaySize);
 
-    const displaySize = {
-      width: videoRef.current.videoWidth,
-      height: videoRef.current.videoHeight,
-    };
-
-    faceapi.matchDimensions(canvas, displaySize);
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    const interval = setInterval(async () => {
-      if (!videoRef.current) return;
-
-      const detections = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceExpressions();
-
-      if (detections) {
-        console.log("Detections:", detections);
-        const resized = faceapi.resizeResults(detections, displaySize);
-        if(ctx){
-          ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset the transform
-          ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear normally
-          ctx.translate(canvas.width, 0);  // Reapply mirror
-          ctx.scale(-1, 1);
-        }
-        faceapi.draw.drawDetections(canvas, resized);
-        faceapi.draw.drawFaceLandmarks(canvas, resized);
-        // === 💥 Extract nose landmark (e.g., 4th point of nose bridge) ===
-        const nose = resized.landmarks.getNose(); // 9 points
-        const point = nose[3]; // central nose bridge point
-
-        // Normalize x/y to -1 to 1 range for R3F
-        const normalizedX = (point.x / displaySize.width) * 2 - 1;
-        const normalizedY = -(point.y / displaySize.height) * 2 + 1;
-        const depth = -0.5; // static for now; can be based on face box width
-
-        setPosition({ x: normalizedX, y: normalizedY, z: depth });
+      // Draw
+      if (ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
       }
-    }, 100);
 
-  // Clean up when modal closes
+      faceapi.draw.drawDetections(canvas, resized);
+      faceapi.draw.drawFaceLandmarks(canvas, resized);
+
+      // Get landmark points
+      const leftEye = resized.landmarks.getLeftEye();
+      const rightEye = resized.landmarks.getRightEye();
+
+      // Midpoint between eyes
+      const midX = (leftEye[0].x + rightEye[3].x) / 2;
+      const midY = (leftEye[0].y + rightEye[3].y) / 2;
+
+      // Normalize to -1..1 (NDC space)
+      const normalizedX = (midX / displaySize.width) * 2 - 1;
+      const normalizedY = -(midY / displaySize.height) * 2 + 1;
+
+      // Estimate face width
+      const eyeDist = Math.hypot(
+        rightEye[3].x - leftEye[0].x,
+        rightEye[3].y - leftEye[0].y
+      );
+
+      const scale = eyeDist / 50; // 🔧 Tweak 50 based on model size
+
+      // Set final values
+      setPosition({
+        x: normalizedX,
+        y: normalizedY,
+        z: -0.5,
+        scale,
+      });
+    }
+  }, 100);
+
   return () => clearInterval(interval);
-  };
+};
+
 
 
   useEffect(() => {
@@ -194,6 +215,7 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
                       (position?.y ?? 0.5), 
                       (position?.z ?? -0.5),
                     ]}
+                    scale={position?.scale ?? 1}
                     />
                 </Suspense>
                 <OrbitControls enableZoom={true} enablePan maxPolarAngle={Math.PI/2}/>
