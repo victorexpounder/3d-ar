@@ -5,6 +5,9 @@ import { X } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { GlassesModel } from './GlassesModel';
 import { OrbitControls } from '@react-three/drei';
+import { useMediaPipeFaceTracker } from '../Hooks/UseFacemesh';
+import * as faceapi from 'face-api.js'
+
 
 interface Props {
   isMainOpen: boolean;
@@ -12,8 +15,10 @@ interface Props {
 }
 
 const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
+ 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [selected, setSelected] = useState(1);
+  const [position, setPosition] = useState<{ x: number; y: number; z: number } | null>(null);
 
   const showModal = () => {
     setIsMainOpen(true);
@@ -35,23 +40,103 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
     }
   };
 
-  useEffect(() => {
-    if(isMainOpen)
-    {
+  const loadModels = async () => {
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+      await faceapi.nets.faceExpressionNet.loadFromUri('/models');
+      console.log('Face API models loaded successfully');
       if (navigator.mediaDevices?.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
           .then((stream) => {
             if (videoRef.current) {
               videoRef.current.srcObject = stream;
+              // Wait for the video to be ready
+              videoRef.current.onloadeddata = () => {
+                startDetection(); // Start detection when video is loaded
+              };
             }
           })
           .catch((err) => console.error("Error accessing camera:", err));
       } else {
         console.error("getUserMedia not supported in this browser");
       }
+    } catch (error) {
+      console.error("Error loading face-api models:", error);
+    }
+  }
+
+  const startDetection = () => {
+    if (!videoRef.current) return;
+
+    const canvas = faceapi.createCanvasFromMedia(videoRef.current);
+    canvas.id = 'face-canvas';
+
+    const container = videoRef.current?.parentElement;
+    if (container) {
+      container.appendChild(canvas);
+    }
+    canvas.style.position = 'absolute';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.zIndex = '20'; // Above video
+
+    const displaySize = {
+      width: videoRef.current.videoWidth,
+      height: videoRef.current.videoHeight,
+    };
+
+    faceapi.matchDimensions(canvas, displaySize);
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    const interval = setInterval(async () => {
+      if (!videoRef.current) return;
+
+      const detections = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      if (detections) {
+        console.log("Detections:", detections);
+        const resized = faceapi.resizeResults(detections, displaySize);
+        if(ctx){
+          ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset the transform
+          ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear normally
+          ctx.translate(canvas.width, 0);  // Reapply mirror
+          ctx.scale(-1, 1);
+        }
+        faceapi.draw.drawDetections(canvas, resized);
+        faceapi.draw.drawFaceLandmarks(canvas, resized);
+      }
+    }, 100);
+
+  // Clean up when modal closes
+  return () => clearInterval(interval);
+  };
+
+
+  useEffect(() => {
+    if(isMainOpen)
+    {
+      loadModels();
     }
   }, [isMainOpen]);
 
+  useEffect(() => {
+    if (videoRef.current?.play) {
+      console.log("Video is playing");
+    }
+  },[])
+
+  
+  
   return (
     <>
       <Modal
@@ -80,7 +165,11 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
                 <ambientLight />
                 <Suspense fallback={null}>
                     <GlassesModel
-                    position={[Math.PI/2, Math.PI/2, 0]}
+                     position={[
+                      (position?.x ?? 0.5) * 2 - 1, // map 0–1 to -1 to 1
+                      -(position?.y ?? 0.5) * 2 + 1,
+                      -(position?.z ?? 0.5), // You can scale this based on depth
+                    ]}
                     />
                 </Suspense>
                 <OrbitControls enableZoom={true} maxPolarAngle={Math.PI/2}/>
