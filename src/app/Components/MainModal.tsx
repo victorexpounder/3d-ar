@@ -177,16 +177,13 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
                 className="w-full h-full object-cover rounded-r-4xl"
             />
             <Canvas
-              orthographic
-              camera={{ zoom: 10, position: [0, 0, 0] }}
               gl={{ alpha: true }}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                width: '640px',
-                height: '480px',
-                
+                width: '100%',
+                height: '100%',
               }}
             >
                 <ambientLight />
