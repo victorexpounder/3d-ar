@@ -114,6 +114,16 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
         }
         faceapi.draw.drawDetections(canvas, resized);
         faceapi.draw.drawFaceLandmarks(canvas, resized);
+        // === 💥 Extract nose landmark (e.g., 4th point of nose bridge) ===
+        const nose = resized.landmarks.getNose(); // 9 points
+        const point = nose[3]; // central nose bridge point
+
+        // Normalize x/y to -1 to 1 range for R3F
+        const normalizedX = (point.x / displaySize.width) * 2 - 1;
+        const normalizedY = -(point.y / displaySize.height) * 2 + 1;
+        const depth = -0.5; // static for now; can be based on face box width
+
+        setPosition({ x: normalizedX, y: normalizedY, z: depth });
       }
     }, 100);
 
@@ -158,21 +168,38 @@ const MainModal: React.FC<Props> = ({isMainOpen, setIsMainOpen}) => {
                 disablePictureInPicture
                 controls={false}
                 muted
-                style={{transform: 'scaleX(-1)'}} 
+                style={{
+                  transform: 'scaleX(-1)',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
                 className="w-full h-full object-cover rounded-r-4xl"
             />
-            <Canvas  gl={{ alpha: true }} style={{ position: 'absolute', top: 0, left: 0 }}>
+            <Canvas
+              orthographic
+              camera={{ zoom: 10, position: [0, 0, 0] }}
+              gl={{ alpha: true }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '640px',
+                height: '480px',
+                
+              }}
+            >
                 <ambientLight />
                 <Suspense fallback={null}>
                     <GlassesModel
                      position={[
-                      (position?.x ?? 0.5) * 2 - 1, // map 0–1 to -1 to 1
-                      -(position?.y ?? 0.5) * 2 + 1,
-                      -(position?.z ?? 0.5), // You can scale this based on depth
+                      (position?.x ?? 0.5), 
+                      (position?.y ?? 0.5), 
+                      (position?.z ?? -0.5),
                     ]}
                     />
                 </Suspense>
-                <OrbitControls enableZoom={true} maxPolarAngle={Math.PI/2}/>
+                <OrbitControls enableZoom={true} enablePan maxPolarAngle={Math.PI/2}/>
             </Canvas>
           </div>
           <div className='flex-1/2 h-full p-4 box-border'>

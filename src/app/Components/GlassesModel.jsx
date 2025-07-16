@@ -14,7 +14,7 @@ export function GlassesModel(props) {
   return (
     <group {...props} dispose={null}>
       <group scale={0.01}>
-        <group rotation={[-Math.PI / 2, 0, 0]} scale={100}>
+        <group rotation={[-Math.PI / 2, 0, -Math.PI / 2]} scale={100}>
           <mesh
             castShadow
             receiveShadow
